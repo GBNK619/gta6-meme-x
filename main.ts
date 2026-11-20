@@ -1,25 +1,39 @@
-// A working gta6-meme-x-01 entry (Node 22, standard library only): it copies POST.json from the repository root to
-// /output/POST.json, where the gate reads it. That is all the program has to do. The entry is the post itself: your
-// agent makes a GTA 6 meme, it is posted on X from a public account with make.fun (a link or written out) and/or a
-// tag of @makefunai and your play code in its text, POST.json names the post, and the house reads the post from X (its
-// first picture and its text) and hands that to the judge. Nothing this program writes about the post is judged.
-//
-// The POST.json this starter ships holds a placeholder address, so the gate refuses it as it stands (valid 0).
-// Replace it with your post's address before you submit.
-//
-// Outside the grader's container, MAKEFUN_BOT_DIR and MAKEFUN_OUTPUT_DIR stand in for /bot and /output:
-//   mkdir -p out && MAKEFUN_BOT_DIR=. MAKEFUN_OUTPUT_DIR=out node main.ts
+// THE PIGGY BANK — gta6-meme-x-01 entry program.
+// The entry itself is a post on X: an original GTA 6 meme (the make.fun
+// ghost topping up a piggy bank that grew a beard waiting since 2013).
+// POST.json at the repository root names that post. This program's whole
+// job is to hand the post in: read POST.json, make sure it really names
+// an X post, and write it to the output directory for the gate to read.
 
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
-const BOT_DIR = process.env.MAKEFUN_BOT_DIR ?? '/bot';
-const OUTPUT_DIR = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+const botDir = process.env.MAKEFUN_BOT_DIR ?? '/bot';
+const outputDir = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
-mkdirSync(OUTPUT_DIR, { recursive: true });
-try {
-  copyFileSync(join(BOT_DIR, 'POST.json'), join(OUTPUT_DIR, 'POST.json'));
-} catch (err) {
-  console.error(`POST.json could not be copied from ${BOT_DIR}: ${(err as Error).message}`);
+function fail(message: string): never {
+  console.error(`piggy-bank: ${message}`);
   process.exit(1);
 }
+
+const raw = readFileSync(join(botDir, 'POST.json'), 'utf8');
+let post: { url?: unknown };
+try {
+  post = JSON.parse(raw) as { url?: unknown };
+} catch {
+  fail('POST.json is not valid JSON');
+}
+
+// Share links copied out of X carry tracking parameters ("?s=46" and the
+// like); the gate wants the post's plain address, so strip any query,
+// fragment and trailing slash before validating and handing the post in.
+const rawUrl = typeof post.url === 'string' ? post.url.trim() : '';
+const url = rawUrl.split(/[?#]/)[0].replace(/\/+$/, '');
+const postPattern = /^https:\/\/(x\.com|twitter\.com)\/[^/]+\/status\/\d+$/;
+if (!postPattern.test(url)) {
+  fail(`POST.json does not name an X post: "${rawUrl}"`);
+}
+
+mkdirSync(outputDir, { recursive: true });
+writeFileSync(join(outputDir, 'POST.json'), `${JSON.stringify({ url })}\n`);
+console.log(`piggy-bank: handing in the post ${url}`);
